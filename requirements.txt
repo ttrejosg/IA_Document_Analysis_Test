@@ -1,0 +1,11 @@
+transformers
+torch
+pandas
+numpy
+pytesseract
+nltk
+rouge
+pillow
+easyocr
+opencv-python
+accelerate>=0.26.0

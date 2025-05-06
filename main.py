@@ -1,0 +1,180 @@
+import io
+import cv2
+import glob
+import json
+import torch
+import easyocr
+import numpy as np
+import pandas as pd
+import transformers
+from PIL import Image
+from rouge import Rouge
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+import pytesseract
+
+class LLLModel:
+    def __init__(self, model_name, cache_dir='model_cache'):
+        self.model_name = model_name
+        self.cache_dir = cache_dir
+        pipeline = transformers.pipeline(
+            "text-generation",
+            model=model_name,
+            model_kwargs={"torch_dtype": torch.bfloat16},
+            device_map="auto",
+        )
+        self.model = pipeline
+
+    def generate_response(self, prompt):
+        print(f"Generating response using {self.model_name}...")
+        messages = [
+            {"role": "system", "content": "You are an expert document analyzer."},
+            {"role": "user", "content": prompt},
+        ]
+
+        outputs = self.model(
+            messages,
+            max_new_tokens=4096,
+        )
+        
+        return outputs[0]['generated_text'][-1]['content'].replace("json", "").replace("```", "").replace("\n", "")
+    
+
+# Preprocess image for better OCR results
+def preprocess_image(image_data):
+    try:
+        # Convert binary data to a NumPy array
+        image = cv2.imdecode(np.frombuffer(image_data, np.uint8), cv2.IMREAD_COLOR)
+
+        # Convert to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Apply thresholding to improve contrast
+        _, binary = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY)
+
+        # Denoise the image
+        denoised = cv2.fastNlMeansDenoising(binary, None, 30, 7, 21)
+
+        return denoised
+    except Exception as e:
+        print(f"Error preprocessing image: {e}")
+        return None
+
+# Extract text from image using EasyOCR
+def extract_text_from_image(image_data):
+    try:
+        # Preprocess the image
+        preprocessed_image = preprocess_image(image_data)
+        if preprocessed_image is None:
+            return ""
+
+        # Use EasyOCR to extract text
+        # reader = easyocr.Reader(["en"], gpu=True)
+        # results = reader.readtext(preprocessed_image, detail=0)
+
+        # # Combine results into a single string
+        # return " ".join(results).strip()
+        
+        # Use pytesseract to extract text
+        try:
+            text = pytesseract.image_to_string(preprocessed_image, lang='eng')
+            # Remove any leading/trailing whitespace
+            return text.strip()
+        except Exception as e:
+            print(f"Error extracting text from image: {e}")
+            return ""
+    except Exception as e:
+        print(f"Error extracting text from image: {e}")
+        return ""
+    
+def show_image(image_data):
+    try:
+        # Convert binary data to a BytesIO object
+        image = Image.open(io.BytesIO(image_data))
+        image.show()  # This will open the image in the default image viewer
+    except Exception as e:
+        print(f"Error displaying image: {e}")
+
+# Preprocess dataset
+def preprocess_dataset(data_folder, max_files=None):
+    print("Preprocessing dataset...")
+    # Read all .parquet files in the folder
+    parquet_files = glob.glob(f"{data_folder}/*.parquet")
+
+    # Limit the number of files to read if max_files is specified
+    if max_files is not None:
+        parquet_files = parquet_files[:max_files]
+
+    # Combine all selected parquet files into a single DataFrame
+    df = pd.concat([pd.read_parquet(file) for file in parquet_files], ignore_index=True)
+
+    # Convert 'image' column to text (placeholder logic for OCR)
+    df['image_text'] = df['image'].apply(lambda x: extract_text_from_image(x['bytes']))
+
+    # Obtener el 'gt_parse', que es la respuesta esperada
+    def clean_ground_truth(gt):
+        gt_dict = json.loads(gt) if isinstance(gt, str) else gt
+        return gt_dict.get('gt_parse', gt_dict)
+
+    df['ground_truth'] = df['ground_truth'].apply(clean_ground_truth)
+    return df
+
+# Evaluate model output against ground truth
+def evaluate_model_output(model_output, ground_truth):
+    # Convert ground_truth to a JSON string if it's a dictionary
+    if isinstance(ground_truth, dict):
+        ground_truth = json.dumps(ground_truth)
+
+    # Ensure model_output is a string
+    if isinstance(model_output, dict):
+        model_output = json.dumps(model_output)
+
+    # Calculate BLEU score with smoothing
+    smoothing_function = SmoothingFunction().method1
+    bleu_score = sentence_bleu([ground_truth.split()], model_output.split(), smoothing_function=smoothing_function)
+
+    # Calculate ROUGE scores
+    rouge = Rouge()
+    rouge_scores = rouge.get_scores(model_output, ground_truth, avg=True)
+
+    return {
+        "bleu": bleu_score,
+        "rouge": rouge_scores
+    }
+
+# Main function
+def main():
+    data_folder = "data"
+    models = [ LLLModel("NousResearch/Meta-Llama-3.1-8B-Instruct"), LLLModel("Qwen/Qwen2.5-7B-Instruct") ]
+
+    # Load dataset
+    df = preprocess_dataset(data_folder)
+
+    for model in models:
+        model_name = model.__class__.__name__
+        metrics = []
+        for _, row in df.iterrows():
+            prompt = f"""You are an expert document analyzer. Your task is to extract the key information from the invoice.
+
+            Instructions:
+            - Do not include any explanation.
+            - Only respond with a JSON file. 
+
+            Invoice content:
+            \"\"\"{row['image_text']}\"\"\""""
+            model_output = model.generate_response(prompt)
+
+            # Evaluate the model output
+            evaluation = evaluate_model_output(model_output, json.dumps(row['ground_truth']))
+            metrics.append(evaluation)
+
+        # Calculate average metrics for the model
+        avg_bleu = sum(m["bleu"] for m in metrics) / len(metrics)
+        avg_rouge = {
+            key: sum(m["rouge"][key]["f"] for m in metrics) / len(metrics)
+            for key in metrics[0]["rouge"].keys()
+        }
+
+        print(f"Model: {model_name}, Average BLEU: {avg_bleu}, Average ROUGE: {avg_rouge}")
+
+if __name__ == "__main__":
+    main()
