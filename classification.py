@@ -183,14 +183,16 @@ def main():
     data_folder = "datasets/classification/train"
 
     lora_pipeline = load_lora_model(
-        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "NousResearch/Meta-Llama-3.1-8B-Instruct",
         "./lora/llama3-finetuned",
     )
 
     models = [
         LLLModel("NousResearch/Meta-Llama-3.1-8B-Instruct"),
         LLLModel("Qwen/Qwen2.5-7B-Instruct"),
-        LLLModel("Meta-Llama-3-8B-Instruct + LoRA", pipeline=lora_pipeline),
+        LLLModel(
+            "NousResearch/Meta-Llama-3.1-8B-Instruct + LoRA", pipeline=lora_pipeline
+        ),
     ]
 
     # Load dataset
