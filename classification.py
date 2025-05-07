@@ -101,7 +101,7 @@ def preprocess_dataset(data_folder, max_files=None):
         concept_ids = data.get("concepts", [])
         concept_labels = [eurovoc_labels.get(cid, "") for cid in concept_ids]
         concept_labels = [label for label in concept_labels if label]  # eliminar vacíos
-        labels_str = ", ".join(concept_labels)
+        labels_str = " ".join(concept_labels)
 
         records.append(
             {
@@ -203,7 +203,7 @@ def main():
         for _, row in df.iterrows():
 
             prompt = f"""
-            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by commas. be specific about the topics of the document. Do not repeat labels.
+            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by spaces. be specific about the topics of the document. Do not repeat labels.
 
             Instructions:
             - Do not include any explanation.
