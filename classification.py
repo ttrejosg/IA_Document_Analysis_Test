@@ -9,7 +9,7 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from peft import PeftModel
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextGenerationPipeline
 
 
 class LLLModel:
@@ -42,26 +42,19 @@ class LLLModel:
 
 def load_lora_model(base_model_name, lora_path):
 
-    print(f"Loading base model: {base_model_name} with LoRA from: {lora_path}")
-
     tokenizer = AutoTokenizer.from_pretrained(base_model_name)
     base_model = AutoModelForCausalLM.from_pretrained(
         base_model_name,
         torch_dtype=torch.bfloat16,
-        device_map="auto",
+        device_map="auto",  # OK here
     )
-
-    # Apply the LoRA weights
     model = PeftModel.from_pretrained(base_model, lora_path)
-
-    # Important: model must be in eval mode for inference
     model.eval()
 
-    # Create a generation pipeline manually
-    pipe = transformers.TextGenerationPipeline(
+    # ❌ DO NOT pass device_map here
+    pipe = TextGenerationPipeline(
         model=model,
         tokenizer=tokenizer,
-        device_map="auto",
     )
 
     return pipe
