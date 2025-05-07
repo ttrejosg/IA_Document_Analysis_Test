@@ -8,18 +8,21 @@ from rouge import Rouge
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from peft import PeftModel, PeftConfig
 
 
 class LLLModel:
-    def __init__(self, model_name):
+    def __init__(self, model_name, pipeline=None):
         self.model_name = model_name
-        pipeline = transformers.pipeline(
-            "text-generation",
-            model=model_name,
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
-        )
-        self.model = pipeline
+        if pipeline is not None:
+            self.model = pipeline
+        else:
+            self.model = transformers.pipeline(
+                "text-generation",
+                model=model_name,
+                model_kwargs={"torch_dtype": torch.bfloat16},
+                device_map="auto",
+            )
 
     def generate_response(self, prompt):
         print(f"Generating response using {self.model_name}...")
@@ -34,6 +37,29 @@ class LLLModel:
         )
 
         return outputs[0]["generated_text"][-1]["content"].replace("\n", "")
+
+
+def load_lora_model(base_model_name, lora_path):
+    print(f"Loading base model: {base_model_name} with LoRA from: {lora_path}")
+    base_model = transformers.AutoModelForCausalLM.from_pretrained(
+        base_model_name,
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
+    )
+
+    tokenizer = transformers.AutoTokenizer.from_pretrained(base_model_name)
+
+    model = PeftModel.from_pretrained(base_model, lora_path, device_map="auto")
+
+    # Wrap in a pipeline
+    pipe = transformers.pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        model_kwargs={"torch_dtype": torch.bfloat16},
+        device_map="auto",
+    )
+    return pipe
 
 
 # Preprocess dataset
@@ -155,9 +181,16 @@ def evaluate_model_output(y_pred, y_true):
 # Main function
 def main():
     data_folder = "datasets/classification/train"
+
+    lora_pipeline = load_lora_model(
+        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "./lora/llama3-finetuned",
+    )
+
     models = [
         LLLModel("NousResearch/Meta-Llama-3.1-8B-Instruct"),
         LLLModel("Qwen/Qwen2.5-7B-Instruct"),
+        LLLModel("Meta-Llama-3-8B-Instruct + LoRA", pipeline=lora_pipeline),
     ]
 
     # Load dataset
