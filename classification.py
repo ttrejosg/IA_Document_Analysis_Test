@@ -186,8 +186,8 @@ def main():
     )
 
     models = [
-        LLLModel("NousResearch/Meta-Llama-3.1-8B-Instruct"),
-        LLLModel("Qwen/Qwen2.5-7B-Instruct"),
+        # LLLModel("NousResearch/Meta-Llama-3.1-8B-Instruct"),
+        # LLLModel("Qwen/Qwen2.5-7B-Instruct"),
         LLLModel(
             "NousResearch/Meta-Llama-3.1-8B-Instruct + LoRA", pipeline=lora_pipeline
         ),
@@ -203,7 +203,7 @@ def main():
         for _, row in df.iterrows():
 
             prompt = f"""
-            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by spaces. use as much words as u can. Classify specific topics about the contents of the document
+            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by commas. use as much labels as u can. be specific about the topics of the document. Do not repeat labels.
 
             Instructions:
             - Do not include any explanation.
