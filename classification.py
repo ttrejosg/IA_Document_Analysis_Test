@@ -203,7 +203,7 @@ def main():
         for _, row in df.iterrows():
 
             prompt = f"""
-            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by commas. use as much labels as u can. be specific about the topics of the document. Do not repeat labels.
+            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by commas. be specific about the topics of the document. Do not repeat labels.
 
             Instructions:
             - Do not include any explanation.
