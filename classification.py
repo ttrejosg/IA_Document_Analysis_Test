@@ -53,7 +53,7 @@ def load_lora_model(base_model_name, lora_path):
 
     # ❌ DO NOT pass device_map here
     pipe = TextGenerationPipeline(
-        model=model,
+        model=model.base_model,
         tokenizer=tokenizer,
     )
 
