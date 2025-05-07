@@ -1,5 +1,6 @@
 import glob
 import json
+import os
 import torch
 import pandas as pd
 import transformers
@@ -38,12 +39,28 @@ class LLLModel:
 # Preprocess dataset
 def preprocess_dataset(data_folder, max_files=None):
     print("Preprocessing dataset...")
+
+    # Cargar el diccionario de etiquetas desde eurovoc_en.json
+    eurovoc_path = os.path.join(data_folder, "../eurovoc_en.json")
+    with open(eurovoc_path, "r", encoding="utf-8") as f:
+        eurovoc_data = json.load(f)
+
+    # Crear un diccionario {id: label}
+    eurovoc_labels = {
+        item["concept_id"]: item["label"] for item in eurovoc_data.values()
+    }
+
+    # Obtener archivos JSON del dataset
     json_files = glob.glob(f"{data_folder}/*.json")
     if max_files:
         json_files = json_files[:max_files]
 
     records = []
+
     for file in json_files:
+        if os.path.basename(file) == "eurovoc_en.json":
+            continue  # Omitir el archivo de etiquetas
+
         with open(file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -56,14 +73,21 @@ def preprocess_dataset(data_folder, max_files=None):
         ]
         full_text = "\n".join([part for part in text_parts if part])
 
+        # Convertir los conceptos a etiquetas de texto
+        concept_ids = data.get("concepts", [])
+        concept_labels = [eurovoc_labels.get(cid, "") for cid in concept_ids]
+        concept_labels = [label for label in concept_labels if label]  # eliminar vacíos
+        labels_str = ", ".join(concept_labels)
+
         records.append(
             {
                 "text": full_text,
-                "concepts": data["concepts"],
+                "concepts": labels_str,
             }
         )
 
-    return pd.DataFrame(records)
+    # Retornar el DataFrame y la lista de posibles etiquetas
+    return pd.DataFrame(records), list(eurovoc_labels.values())
 
 
 embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
@@ -137,17 +161,8 @@ def main():
     ]
 
     # Load dataset
-    df = preprocess_dataset(data_folder)
-    df[:1]
-    # list of posible labels in the dataset
-    df_labels = set()
-    for _, row in df.iterrows():
-        labels = row["concepts"]
-        if isinstance(labels, str):
-            labels = labels.split()
-        df_labels.update(labels)
-    df_labels = list(df_labels)
-    print(df_labels)
+    df, _ = preprocess_dataset(data_folder)
+    df = df[:10]
 
     for model in models:
         model_name = model.model_name
@@ -155,14 +170,11 @@ def main():
         for _, row in df.iterrows():
 
             prompt = f"""
-            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by spaces.
+            You are an expert document analyzer. Your task is to classify the document content provided below. Respond with labels separated by spaces. use as much words as u can. Classify specific topics about the contents of the document
 
             Instructions:
             - Do not include any explanation.
-            - Use concise words.
             - respond with labels only.
-
-            list of possible labels: {df_labels}
 
             Document content:
             \"\"\"{df["text"]}\"\"\""""

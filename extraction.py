@@ -188,7 +188,8 @@ def evaluate_model_output(model_output, ground_truth):
 def main():
     data_folder = "datasets/extraction"
     models = [
-        LLLModel("Qwen/Qwen2.5-7B-Instruct"),
+        LLLModel("NousResearch/Meta-Llama-3-8B-Instruct"),
+        # LLLModel("Qwen/Qwen2.5-7B-Instruct"),
     ]
 
     # Load dataset
@@ -199,6 +200,11 @@ def main():
         metrics = []
         for _, row in df.iterrows():
             prompt = f"""You are an expert document analyzer. Your task is to extract the key information from the invoice.
+
+            This is the list of posible fields:
+                [
+                menu, menu.nm, menu.num, menu.unitprice, menu.cnt, menu.discountprice, menu.price, menu.itemsubtotal, menu.vatyn, menu.etc, menu.sub_nm, menu.sub_num, menu.sub_unitprice, menu.sub_cnt, menu.sub_discountprice, menu.sub_price, menu.sub_etc, void_menu, void_menu.nm, voidmenu.num, voidmenu.unitprice, voidmenu.cnt, void_menu.price, voidmenu.etc, subtotal, subtotal.subtotal_price, subtotal.discount_price, subtotal.subtotal_count, subtotal.service_price, subtotal.othersvc_price, subtotal.tax_price, subtotal.tax_and_service, subtotal.etc, total, total.total_price, total.total_etc, total.cashprice, total.changeprice, total.creditcardprice, total.emoneyprice, total.menutype_cnt, total.menuqty_cnt
+                ]
 
             Instructions:
             - Do not include any explanation.
