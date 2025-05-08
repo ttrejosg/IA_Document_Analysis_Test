@@ -190,7 +190,7 @@ def main():
     data_folder = "datasets/extraction"
     models = [
         LLLModel("NousResearch/Meta-Llama-3-8B-Instruct"),
-        # LLLModel("Qwen/Qwen2.5-7B-Instruct"),
+        LLLModel("Qwen/Qwen2.5-7B-Instruct"),
     ]
 
     # Load dataset
