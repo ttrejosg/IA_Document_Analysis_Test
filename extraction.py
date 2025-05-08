@@ -118,6 +118,7 @@ def preprocess_dataset(data_folder, max_files=None):
 
     # Combine all selected parquet files into a single DataFrame
     df = pd.concat([pd.read_parquet(file) for file in parquet_files], ignore_index=True)
+    df = df[:2]
     show_image(df["image"][0]["bytes"])
 
     # Convert 'image' column to text (placeholder logic for OCR)
@@ -213,6 +214,8 @@ def main():
             Invoice content:
             \"\"\"{row['image_text']}\"\"\""""
             model_output = model.generate_response(prompt)
+            print(f"Model output: {model_output}")
+            print(f"Concepts: {row['ground_truth']}")
 
             # Evaluate the model output
             evaluation = evaluate_model_output(
